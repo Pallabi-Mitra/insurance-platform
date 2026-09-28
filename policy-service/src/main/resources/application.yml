@@ -1,0 +1,68 @@
+# ============================================================
+# Policy Service configuration
+# Spring Boot reads this file at startup and configures itself.
+# ============================================================
+
+# ---- Web server ----
+server:
+  # Port this service listens on. Each microservice gets its own port
+  # so they can run side by side on one machine.
+  port: 8081
+
+spring:
+  application:
+    # Service name. Shows up in logs and monitoring, so you can tell services apart.
+    name: policy-service
+
+  # ---- Database connection ----
+  datasource:
+    # JDBC URL = how Java finds the database.
+    #   jdbc:oracle:thin  -> use Oracle's pure Java ("thin") driver
+    #   localhost:1521    -> Docker forwards this port into the Oracle container
+    #   /FREEPDB1         -> the pluggable database ("apartment") our user lives in
+    url: jdbc:oracle:thin:@localhost:1521/FREEPDB1
+    username: insurance
+    # NOTE: hardcoded only for local development.
+    # In production this comes from an environment variable or a secrets manager
+    # (e.g., AWS Secrets Manager), never committed to Git.
+    password: insurancepass
+
+    # Connection pool (HikariCP, Spring Boot's default).
+    # Opening a DB connection is slow, so the pool keeps a few open and reuses them.
+    hikari:
+      maximum-pool-size: 10   # max connections at the same time
+      minimum-idle: 2         # keep at least 2 ready even when idle
+
+  # ---- JPA / Hibernate ----
+  jpa:
+    hibernate:
+      # "validate" = Hibernate checks our Java entities match the tables, but never changes tables.
+      # Flyway owns the schema. Letting Hibernate auto-create tables ("update") is risky in production
+      # because it can make unreviewed schema changes.
+      ddl-auto: validate
+    # Print generated SQL to the console, so you can SEE what JPA does behind the scenes.
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true     # pretty-print that SQL
+    # Keeps DB sessions from staying open during the whole web request.
+    # Leaving it true (the default) hides performance problems, so we turn it off.
+    open-in-view: false
+
+  # ---- Flyway (database migrations) ----
+  flyway:
+    enabled: true
+    # Where our versioned SQL files live: src/main/resources/db/migration
+    locations: classpath:db/migration
+
+# ---- Actuator (production monitoring endpoints) ----
+management:
+  endpoints:
+    web:
+      exposure:
+        # Only expose what we need. Exposing everything is a security risk.
+        include: health,info,metrics
+  endpoint:
+    health:
+      # Show details like "database: UP" in the health response.
+      show-details: always
